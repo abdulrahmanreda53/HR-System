@@ -72,8 +72,12 @@ public final class Dtos {
         }
     }
 
+    public record DailyAttendanceResponse(LocalDate date, LocalDateTime firstCheckIn, LocalDateTime lastCheckOut,
+                                          Long workedMinutes, Boolean isLate, Integer lateMinutes) {
+
+    }
+
     // ---- Payroll ----
-    /** Provide EITHER amount OR days (a fraction of the daily wage, e.g. 0.25 or 0.5), never both. */
     public record ManualTransactionRequest(
             @NotNull Long userId,
             @Positive BigDecimal amount,

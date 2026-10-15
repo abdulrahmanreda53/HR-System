@@ -1,8 +1,10 @@
 package com.company.hr.controller;
 
 import com.company.hr.dto.Dtos.AttendanceResponse;
+import com.company.hr.dto.Dtos.DailyAttendanceResponse;
 import com.company.hr.security.AppUserDetails;
 import com.company.hr.service.AttendanceService;
+import com.company.hr.dto.Dtos.DailyAttendanceResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -34,6 +36,23 @@ public class AttendanceController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return attendanceService.getAttendance(userId, startOrDefault(from), endOrDefault(to));
+    }
+
+    @GetMapping("/me/daily")
+    public List<DailyAttendanceResponse> myDaily(
+            @AuthenticationPrincipal AppUserDetails me,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return attendanceService.getDailySummary(me.getId(), startOrDefault(from), endOrDefault(to));
+    }
+
+    @GetMapping("/user/{userId}/daily")
+    @PreAuthorize("hasRole('HR')")
+    public List<DailyAttendanceResponse> dailyForUser(
+            @PathVariable Long userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return attendanceService.getDailySummary(userId, startOrDefault(from), endOrDefault(to));
     }
 
     private LocalDate startOrDefault(LocalDate from) {

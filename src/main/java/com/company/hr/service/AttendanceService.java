@@ -1,6 +1,7 @@
 package com.company.hr.service;
 
 import com.company.hr.dto.Dtos.AttendanceResponse;
+import com.company.hr.dto.Dtos.DailyAttendanceResponse;
 import com.company.hr.entity.Attendance;
 import com.company.hr.entity.User;
 import com.company.hr.enums.AttendanceType;
@@ -19,7 +20,14 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+
+import static com.fasterxml.jackson.databind.type.LogicalType.Map;
 
 @Slf4j
 @Service
@@ -76,6 +84,41 @@ public class AttendanceService {
         return attendanceRepository
                 .findByUserIdAndTimestampBetweenOrderByTimestampAsc(userId, from.atStartOfDay(), to.atTime(LocalTime.MAX))
                 .stream().map(AttendanceResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<DailyAttendanceResponse> getDailySummary(Long userId, LocalDate from, LocalDate to) {
+        if (!userRepository.existsById(userId)) {
+            throw new ResourceNotFoundException("User not found: " + userId);
+        }
+        List<Attendance> punches = attendanceRepository
+                .findByUserIdAndTimestampBetweenOrderByTimestampAsc(userId, from.atStartOfDay(), to.atTime(LocalTime.MAX));
+
+        Map<LocalDate, List<Attendance>> byDay = punches.stream().collect(
+                Collectors.groupingBy(a -> a.getTimestamp().toLocalDate(), TreeMap::new, Collectors.toList()));
+
+        List<DailyAttendanceResponse> result = new ArrayList<>();
+        for (Map.Entry<LocalDate, List<Attendance>> entry : byDay.entrySet()) {
+            List<Attendance> day = entry.getValue();
+
+            LocalDateTime firstIn = day.stream()
+                    .filter(a -> a.getType() == AttendanceType.CHECK_IN)
+                    .map(Attendance::getTimestamp).min(Comparator.naturalOrder()).orElse(null);
+            LocalDateTime lastOut = day.stream()
+                    .filter(a -> a.getType() == AttendanceType.CHECK_OUT)
+                    .map(Attendance::getTimestamp).max(Comparator.naturalOrder()).orElse(null);
+
+            Long worked = (firstIn != null && lastOut != null && lastOut.isAfter(firstIn))
+                    ? Duration.between(firstIn, lastOut).toMinutes() : null;
+
+            int lateMinutes = day.stream()
+                    .filter(a -> Boolean.TRUE.equals(a.getIsLate()))
+                    .mapToInt(Attendance::getLateMinutes).max().orElse(0);
+
+            result.add(new DailyAttendanceResponse(entry.getKey(), firstIn, lastOut, worked,
+                    lateMinutes > 0, lateMinutes));
+        }
+        return result;
     }
 
 
